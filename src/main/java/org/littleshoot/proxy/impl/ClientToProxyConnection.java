@@ -23,6 +23,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 
 import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
@@ -233,6 +234,8 @@ public class ClientToProxyConnection extends ProxyConnection<HttpRequest> {
                         proxyServer,
                         this,
                         serverHostAndPort,
+                        "ppp1",
+                        80,
                         httpRequest);
                 if (currentServerConnection == null) {
                     LOG.debug("Unable to create server connection, probably no chained proxies available");
@@ -248,6 +251,8 @@ public class ClientToProxyConnection extends ProxyConnection<HttpRequest> {
                 writeBadGateway(httpRequest);
                 resumeReading();
                 return DISCONNECT_REQUESTED;
+            } catch (SocketException e) {
+                e.printStackTrace();
             }
         } else {
             LOG.debug("Reusing existing server connection: {}",
@@ -490,6 +495,9 @@ public class ClientToProxyConnection extends ProxyConnection<HttpRequest> {
             }
         } catch (UnknownHostException uhe) {
             connectionFailedUnrecoverably(initialRequest);
+            return false;
+        } catch (SocketException e) {
+            e.printStackTrace();
             return false;
         }
     }

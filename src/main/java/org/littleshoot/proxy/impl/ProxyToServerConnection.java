@@ -26,6 +26,7 @@ import io.netty.util.concurrent.GenericFutureListener;
 
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -69,6 +70,8 @@ public class ProxyToServerConnection extends ProxyConnection<HttpResponse> {
     private volatile InetSocketAddress remoteAddress;
     private volatile InetSocketAddress localAddress;
     private final String serverHostAndPort;
+    private final String interfaceName;
+    private final int interfacePort;
     private volatile ChainedProxy chainedProxy;
     private final Queue<ChainedProxy> availableChainedProxies;
 
@@ -127,9 +130,9 @@ public class ProxyToServerConnection extends ProxyConnection<HttpResponse> {
      */
     static ProxyToServerConnection create(DefaultHttpProxyServer proxyServer,
             ClientToProxyConnection clientConnection,
-            String serverHostAndPort,
+            String serverHostAndPort, String interfaceName, int interfacePort,
             HttpRequest initialHttpRequest)
-            throws UnknownHostException {
+            throws UnknownHostException, SocketException {
         Queue<ChainedProxy> chainedProxies = new ConcurrentLinkedQueue<ChainedProxy>();
         ChainedProxyManager chainedProxyManager = proxyServer
                 .getChainProxyManager();
@@ -142,19 +145,23 @@ public class ProxyToServerConnection extends ProxyConnection<HttpResponse> {
             }
         }
         return new ProxyToServerConnection(proxyServer, clientConnection,
-                serverHostAndPort, chainedProxies.poll(), chainedProxies);
+                serverHostAndPort, interfaceName, interfacePort, chainedProxies.poll(), chainedProxies);
     }
 
     private ProxyToServerConnection(
             DefaultHttpProxyServer proxyServer,
             ClientToProxyConnection clientConnection,
             String serverHostAndPort,
+            String interfaceName,
+            int interfacePort,
             ChainedProxy chainedProxy,
             Queue<ChainedProxy> availableChainedProxies)
-            throws UnknownHostException {
+            throws UnknownHostException, SocketException {
         super(DISCONNECTED, proxyServer, true);
         this.clientConnection = clientConnection;
         this.serverHostAndPort = serverHostAndPort;
+        this.interfaceName = interfaceName;
+        this.interfacePort = interfacePort;
         this.chainedProxy = chainedProxy;
         this.availableChainedProxies = availableChainedProxies;
         setupConnectionParameters();
@@ -636,7 +643,7 @@ public class ProxyToServerConnection extends ProxyConnection<HttpResponse> {
      * @return true if we are trying to fall back to another connection
      */
     protected boolean connectionFailed(Throwable cause)
-            throws UnknownHostException {
+            throws UnknownHostException, SocketException {
         if (this.chainedProxy != null) {
             // Let the ChainedProxy know that we were unable to connect
             try {
@@ -661,7 +668,7 @@ public class ProxyToServerConnection extends ProxyConnection<HttpResponse> {
      * 
      * @throws UnknownHostException
      */
-    private void setupConnectionParameters() throws UnknownHostException {
+    private void setupConnectionParameters() throws UnknownHostException, SocketException {
         if (chainedProxy != null
                 && chainedProxy != ChainedProxyAdapter.FALLBACK_TO_DIRECT_CONNECTION) {
             this.transportProtocol = chainedProxy.getTransportProtocol();
@@ -670,7 +677,7 @@ public class ProxyToServerConnection extends ProxyConnection<HttpResponse> {
         } else {
             this.transportProtocol = TransportProtocol.TCP;
             this.remoteAddress = addressFor(serverHostAndPort, proxyServer);
-            this.localAddress = null;
+            this.localAddress = localAddressFor(interfaceName ,interfacePort , proxyServer);
         }
     }
 
@@ -768,6 +775,22 @@ public class ProxyToServerConnection extends ProxyConnection<HttpResponse> {
         }
 
         return proxyServer.getServerResolver().resolve(host, port);
+    }
+
+    /**
+     * Build an {@link InetSocketAddress} for the given interface name and port.
+     *
+     * @param interfaceName
+     * @param port
+     * @param proxyServer
+     *            the current {@link ProxyServer}
+     * @return
+     * @throws java.net.SocketException
+     */
+    private static InetSocketAddress localAddressFor(String interfaceName, int port,
+                                                DefaultHttpProxyServer proxyServer) throws SocketException {
+
+        return proxyServer.getServerResolver().getLocalAddress(interfaceName, port);
     }
 
     /***************************************************************************
