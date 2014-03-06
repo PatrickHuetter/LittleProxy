@@ -23,7 +23,9 @@ public class DefaultHostResolver implements HostResolver {
         Enumeration<InetAddress> inetAddressEnumeration = networkInterface.getInetAddresses();
         ArrayList<InetAddress> inetAddresses = Collections.list(inetAddressEnumeration);
         if (!inetAddresses.isEmpty()) {
-            InetAddress inetAddress = inetAddresses.get(0);
+
+            // chose second inetAdress, because first inetAdress is IPv6
+            InetAddress inetAddress = inetAddresses.get(1);
             return new InetSocketAddress(inetAddress, port);
         }
         return null;

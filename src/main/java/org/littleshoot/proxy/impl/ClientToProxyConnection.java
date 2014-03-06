@@ -234,7 +234,7 @@ public class ClientToProxyConnection extends ProxyConnection<HttpRequest> {
                         proxyServer,
                         this,
                         serverHostAndPort,
-                        "ppp1",
+                        "en1",
                         80,
                         httpRequest);
                 if (currentServerConnection == null) {
